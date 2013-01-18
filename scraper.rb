@@ -22,5 +22,4 @@ class Scrape
   end
 end
 
-scraper = Scrape.new
-scraper.get_data
+Scrape.new.get_data
