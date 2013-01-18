@@ -1,23 +1,26 @@
-require "nokogiri"
-require "curb"
+require "capybara"
+require "capybara/dsl"
+require "capybara/webkit"
 
-query = {
-  "K01"             => "WINQ000",
-  "DFH_STATE_TOKEN" => "abvdwoan",
-  "M00_DIN_FLD1I"   => "12",
-  "M00_DIN_FLD2I"   => "A",
-  "M00_DIN_FLD3I"   => "0001"
-}
-
-request = Curl::Easy.http_post("http://nysdoccslookup.doccs.ny.gov/GCA00P00/WIQ1/WINQ000",
-                               query.map { |k, v| Curl::PostField.content(k, v) })
-
-begin
-  request.perform
-rescue e => Curl::Err
-  puts "There was an error with the HTTP request."
-  puts e.inspect
-else
-  puts request.body_str
+Capybara.configure do |config|
+  config.run_server     = false
+  config.default_driver = :webkit
+  config.app_host       = "http://nysdoccslookup.doccs.ny.gov"
 end
 
+class Scrape
+  include Capybara::DSL
+
+  def get_data
+    visit "/"
+    fill_in "M00_DIN_FLD1I", :with => "12"
+    fill_in "M00_DIN_FLD2I", :with => "A"
+    fill_in "M00_DIN_FLD3I", :with => "0001"
+    click_button "Submit"    
+    
+    puts page.find("#content").text
+  end
+end
+
+scraper = Scrape.new
+scraper.get_data
