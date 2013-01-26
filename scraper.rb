@@ -1,20 +1,26 @@
 require "capybara"
 require "capybara/dsl"
-require "capybara/webkit"
 
 Capybara.configure do |config|
-  config.run_server     = false
-  config.default_driver = :webkit
-  config.app_host       = "http://nysdoccslookup.doccs.ny.gov"
+  config.run_server        = false
+  config.default_driver    = :selenium
+  config.javascript_driver = :selenium
+  config.app_host          = "http://nysdoccslookup.doccs.ny.gov"
 end
 
 class Scrape
   include Capybara::DSL
-  
+
+  class ContentError < StandardError; end
+
   def go
     (0..100).each do |number|
-      puts get_prisoner_by_din("12", "A", number.to_s.rjust(4, "0"))
-      sleep(30)
+      begin
+        puts(get_prisoner_by_din("12", "A", number.to_s.rjust(4, "0")).inspect)
+      rescue ContentError => error
+        puts "Hit an error, check the inspected exception:"
+        puts error.inspect
+      end
     end
   end
 
@@ -26,17 +32,15 @@ class Scrape
     fill_in "M00_DIN_FLD2I", :with => letter.to_s
     fill_in "M00_DIN_FLD3I", :with => sequence.to_s
     click_button "Submit"    
-    
+
     # Did we hit an error page?
-    errors = page.all("p.err")
-    if errors.size > 0
-      puts errors.map { |x| x.text }.join(", ")
-      return
-    end
+    error = page.all("p.err").first
+    raise ContentError, error.text if error.text.length > 0
     
     store = {} # A hash of data.
 
     tables = page.find("#content").all("table")
+    puts tables.inspect
 
     # ID + Location info
     store.merge!(Hash[tables[0].all("th").map { |x| x.text }.zip(tables[0].all("td").map { |x| x.text })])
@@ -49,7 +53,7 @@ class Scrape
     crimes["crimes"] = Hash[tables[1].all("td[headers=crime]").map { |x| x.text }.zip(tables[1].all("td[headers=class]").map { |x| x.text })]
     store.merge!(crimes)  
       
-    store
+    return store
   end
 end
 
