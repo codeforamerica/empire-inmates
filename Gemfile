@@ -1,2 +1,5 @@
 source "http://rubygems.org"
 gem "capybara"
+gem "json", "~> 1.7.6"
+gem "sequel"
+gem "pg"

@@ -1,5 +1,10 @@
 require "capybara"
 require "capybara/dsl"
+require "json"
+require "sequel"
+require "pg"
+
+COLUMNS = ["DIN (Department Identification Number)", "Inmate Name", "Sex", "Date of Birth", "Race / Ethnicity", "Custody Status", "Housing / Releasing Facility", "Date Received (Original)", "Date Received (Current)", "Admission Type", "County of Commitment", "Latest Release Date / Type (Released Inmates Only)", "Aggregate Minimum Sentence", "Aggregate Maximum Sentence", "Earliest Release Date", "Earliest Release Type", "Parole Hearing Date", "Parole Hearing Type", "Parole Eligibility Date", "Conditional Release Date", "Maximum Expiration Date", "Maximum Expiration Date for Parole Supervision", "Post Release Supervision Maximum Expiration Date", "Parole Board Discharge Date", "crimes"]
 
 Capybara.configure do |config|
   config.run_server        = false
@@ -8,18 +13,44 @@ Capybara.configure do |config|
   config.app_host          = "http://nysdoccslookup.doccs.ny.gov"
 end
 
+# Use an environment variable if defaults aren't good enough or for convenience if we're running
+# on Heroku.
+db_url = ENV['DATABASE_URL'] || "postgres://cfanyc:cfanyc@localhost:5432/inmate_data"
+DB = Sequel.connect(db_url)
+
+DB.create_table? :inmates do
+  column :din, String
+  column :name, String
+  column :sex, String
+  column :dob, String
+  column :race, String
+  column :custody_status, String
+  column :facility, String
+  column :original_date_received, String
+  column :current_date_received, String
+  
+end
+
 class Scrape
   include Capybara::DSL
 
   class ContentError < StandardError; end
+  
+  attr_accessor :inmates
+
+  def initialize
+    self.inmates = DB[:inmates]
+  end
 
   def go
-    (0..100).each do |number|
+    (101..500).each do |number|
       begin
-        puts(get_prisoner_by_din("12", "A", number.to_s.rjust(4, "0")).inspect)
-      rescue ContentError => error
-        puts "Hit an error, check the inspected exception:"
-        puts error.inspect
+        inmate = get_prisoner_by_din("12", "A", number.to_s.rjust(4, "0"))
+        puts self.inmates.insert(inmate.values)
+        # rescue ContentError => error
+      rescue StandardError => error
+        # puts "Hit an error, check the inspected exception:"
+        # puts error.inspect
       end
     end
   end
@@ -40,7 +71,6 @@ class Scrape
     store = {} # A hash of data.
 
     tables = page.find("#content").all("table")
-    puts tables.inspect
 
     # ID + Location info
     store.merge!(Hash[tables[0].all("th").map { |x| x.text }.zip(tables[0].all("td").map { |x| x.text })])
