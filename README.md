@@ -1,4 +1,4 @@
-nys-inmate-info-scraper
+empire-inmates
 =======================
 
-Scrapes data on New York State inmates.
+Scrapes and visualizes data on inmates in the New York State prison system.
